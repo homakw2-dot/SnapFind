@@ -1,53 +1,35 @@
-# SnapFind 🔍
+# SnapFind
 
-A fast, privacy-focused desktop application for indexing and searching text across screenshots and images locally on Windows.
+Fast and privacy-focused desktop tool for searching text across screenshots and images locally on Windows.
 
-No cloud uploads, no heavy models, no tracking. Everything runs 100% offline using native Windows OCR and SQLite.
+Everything runs 100% offline using native Windows OCR and SQLite.
 
-![SnapFind Preview](docs/preview.png)
+## Highlights
 
-## Features
+- **Instant Search**: Search through hundreds of screenshots by any keyword, number, or phrase.
+- **High Performance**: Asynchronous multi-worker engine processing multiple images concurrently.
+- **Smart Cache**: Fast file metadata checks (`os.stat`) to skip unchanged images in milliseconds.
+- **100% Offline & Private**: Native Windows Media OCR integration with zero cloud dependencies.
+- **Clean Dark UI**: Built with CustomTkinter with responsive cards, thumbnails, and preview modal.
+- **Direct Copy**: Copy full extracted text or snippets straight to the clipboard.
 
-- **Instant Text Search**: Search through thousands of screenshots by any keyword, error code, phrase, or number.
-- **100% Offline & Private**: Uses native Windows Media OCR API. Zero data leaves your computer.
-- **Fast Local Indexing**: Computes image hashes to avoid re-scanning unmodified files.
-- **Modern Dark GUI**: Built with CustomTkinter with responsive cards, thumbnails, and preview modal.
-- **One-Click Text Extraction**: Instantly copy full recognized text or specific snippets directly to your clipboard.
-- **Bilingual OCR**: Seamlessly handles Cyrillic and Latin text concurrently (Russian + English).
+## Requirements
 
-## Tech Stack
+- Windows 10 / 11
+- Python 3.10+
 
-- **Python 3.10+**
-- **GUI**: [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
-- **OCR Engine**: [winocr](https://github.com/intxcc/winocr) (Windows.Media.Ocr native bindings)
-- **Database**: SQLite3
-- **Image Processing**: Pillow
+## Setup
 
-## Quickstart
-
-### 1. Clone the repository
 ```bash
-git clone https://github.com/Homak2/SnapFind.git
+git clone https://github.com/homakw2-dot/SnapFind.git
 cd SnapFind
-```
-
-### 2. Install dependencies
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run
+## Running
+
+Launch the app:
 ```bash
 python main.py
 ```
-
-## How It Works
-
-1. Click **«Сканировать папку»** and choose your screenshots or pictures folder.
-2. The background worker parses images, extracts text via native Windows OCR, and stores hashes in a local `snapfind.db`.
-3. Type any text in the search bar — matching images appear instantly with snippet highlights and thumbnails.
-4. Click thumbnail to open the inspector view or hit **«Копировать текст»** to grab the OCR text.
-
-## License
-
-MIT
+Or double-click `SnapFind.pyw` to run directly without opening a terminal window.
