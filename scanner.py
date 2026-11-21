@@ -1,31 +1,24 @@
 import os
-import hashlib
 import asyncio
 from PIL import Image
 import winocr
 
 SUPPORTED_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
+MAX_DIMENSION = 1400
+CONCURRENCY = 6
 
-def get_file_hash(filepath):
-    hasher = hashlib.md5()
-    try:
-        with open(filepath, "rb") as f:
-            while chunk := f.read(65536):
-                hasher.update(chunk)
-        return hasher.hexdigest()
-    except Exception:
-        return None
-
-async def extract_text(image_path):
+async def extract_text_from_file(image_path):
     try:
         with Image.open(image_path) as img:
             rgb_img = img.convert("RGB")
+            w, h = rgb_img.size
+            if max(w, h) > MAX_DIMENSION:
+                ratio = MAX_DIMENSION / max(w, h)
+                nw, nh = int(w * ratio), int(h * ratio)
+                rgb_img = rgb_img.resize((nw, nh), Image.Resampling.BILINEAR)
+
             res = await winocr.recognize_pil(rgb_img, "ru")
-            text = res.text.strip() if res and res.text else ""
-            if not text:
-                res_en = await winocr.recognize_pil(rgb_img, "en")
-                text = res_en.text.strip() if res_en and res_en.text else ""
-            return text
+            return res.text.strip() if res and res.text else ""
     except Exception:
         return ""
 
@@ -41,7 +34,7 @@ class ScanWorker:
     def scan_directory(self, folder_path, progress_callback=None, status_callback=None):
         self.is_running = True
         self._stop_requested = False
-        
+
         image_files = []
         for root, _, files in os.walk(folder_path):
             for file in files:
@@ -56,27 +49,49 @@ class ScanWorker:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        try:
-            for idx, file_path in enumerate(image_files, 1):
+        async def _run_all():
+            nonlocal indexed_count, skipped_count
+            sem = asyncio.Semaphore(CONCURRENCY)
+            processed_counter = 0
+
+            async def _process_file(file_path):
+                nonlocal indexed_count, skipped_count, processed_counter
                 if self._stop_requested:
-                    break
+                    return
 
-                if status_callback:
-                    status_callback(f"[{idx}/{total}] {os.path.basename(file_path)}")
-                if progress_callback:
-                    progress_callback(idx, total)
+                try:
+                    stat = os.stat(file_path)
+                    f_size = stat.st_size
+                    f_mtime = stat.st_mtime
+                except Exception:
+                    return
 
-                f_hash = get_file_hash(file_path)
-                if not f_hash:
-                    continue
-
-                if self.db.is_indexed(file_path, f_hash):
+                if self.db.is_indexed(file_path, f_size, f_mtime):
                     skipped_count += 1
-                    continue
+                    processed_counter += 1
+                    if progress_callback:
+                        progress_callback(processed_counter, total)
+                    return
 
-                text = loop.run_until_complete(extract_text(file_path))
-                self.db.upsert_image(file_path, f_hash, text)
-                indexed_count += 1
+                async with sem:
+                    if self._stop_requested:
+                        return
+                    if status_callback:
+                        status_callback(f"[{processed_counter + 1}/{total}] {os.path.basename(file_path)}")
+
+                    text = await extract_text_from_file(file_path)
+                    self.db.upsert_image(file_path, f_size, f_mtime, text)
+                    indexed_count += 1
+                    processed_counter += 1
+
+                    if progress_callback:
+                        progress_callback(processed_counter, total)
+
+            tasks = [_process_file(fp) for fp in image_files]
+            await asyncio.gather(*tasks)
+
+        try:
+            loop.run_until_complete(_run_all())
         finally:
             loop.close()
             self.is_running = False
